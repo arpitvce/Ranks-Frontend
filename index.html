@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ranker – CGPA leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-top: #03070a; --bg-mid: #081317; --bg-bottom: #11201f;
+    --accent: #a3b899; --text: #f3f5f4; --muted: #8b9499;
+    --panel: #161a1c; --line: rgba(255,255,255,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--text);
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 60%, var(--bg-bottom) 100%);
+    background-attachment: fixed; min-height: 100vh; overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  #stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .star { position: absolute; border-radius: 50%; background: #fff; }
+  .dunes { position: fixed; left: 0; bottom: 0; width: 100%; height: 22vh; z-index: 0; pointer-events: none; }
+  .page { position: relative; z-index: 1; padding-bottom: 14vh; }
+
+  nav { max-width: 1200px; margin: 0 auto; padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-weight: 600; font-size: 1.4rem; letter-spacing: -.02em; }
+  .nav-links { display: flex; align-items: center; gap: 1.5rem; font-size: .95rem; color: #c9cfd2; }
+  .nav-links a:hover { color: #fff; }
+  .pill { border: 1px solid var(--line); border-radius: 8px; padding: .4rem .8rem; background: rgba(255,255,255,.03); font-size: .9rem; }
+  @media (max-width: 760px) { .nav-links a:not(.pill) { display: none; } }
+
+  .hero { text-align: center; padding: 4.5rem 1.5rem 1rem; }
+  h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); font-weight: 300; line-height: 1.08; letter-spacing: -.03em; max-width: 16ch; margin: 0 auto; }
+  h1 .accent { color: var(--accent); }
+  .sub { margin-top: 1.5rem; color: var(--muted); font-size: 1.1rem; }
+
+  .tabs { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: 2.5rem; }
+  .tab { padding: .7rem 1.2rem; border-radius: 8px; color: #c9cfd2; transition: background .2s, color .2s; }
+  .tab:hover { color: #fff; }
+  .tab[aria-selected="true"] { background: #1d2427; color: #fff; }
+
+  .controls { max-width: 720px; margin: 1.2rem auto 0; display: flex; gap: .6rem; }
+  .controls input { flex: 1; padding: 1rem 1.1rem; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.04); }
+  .controls input::placeholder { color: var(--muted); }
+  .controls select { padding: 0 1rem; border-radius: 8px; border: 1px solid var(--line); background: #1d2427; }
+  .meta { max-width: 720px; margin: .7rem auto 0; display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); }
+  .meta strong { color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .board { max-width: 960px; margin: 2rem auto 0; padding: .5rem 1.5rem 1.5rem; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+  .row { display: grid; grid-template-columns: 70px 1fr 100px 90px; align-items: center; padding: 1rem .5rem; border-bottom: 1px solid var(--line); }
+  .row.head { color: var(--muted); font-size: .85rem; padding-top: 1.1rem; }
+  .row:last-child { border-bottom: 0; }
+  .rank { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .top .rank { color: var(--accent); font-weight: 600; }
+  .name { font-weight: 500; }
+  .roll { display: block; color: var(--muted); font-size: .82rem; font-weight: 400; margin-top: .15rem; }
+  .branch { color: #c9cfd2; font-size: .9rem; }
+  .cgpa { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .top .cgpa { color: var(--accent); }
+  .empty { padding: 2.5rem 0; text-align: center; color: var(--muted); }
+  .more { display: block; margin: 1rem auto 0; padding: .7rem 1.4rem; border-radius: 8px; background: #1d2427; color: #c9cfd2; }
+  .more:hover { color: #fff; }
+  .note { text-align: center; margin-top: 1rem; font-size: .8rem; color: var(--muted); }
+  @media (max-width: 600px) { .row { grid-template-columns: 50px 1fr 70px; } .row > .branch { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+  <div id="stars" aria-hidden="true"></div>
+
+  <svg class="dunes" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="d1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2f22"/><stop offset="1" stop-color="#1a1510"/></linearGradient>
+      <linearGradient id="d2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a3b2a"/><stop offset="1" stop-color="#1f1812"/></linearGradient>
+    </defs>
+    <path d="M0 150 C 200 90, 380 130, 560 160 S 900 170, 1100 120 S 1360 90, 1440 130 L1440 220 L0 220Z" fill="url(#d1)" opacity=".75"/>
+    <path d="M0 190 C 150 150, 300 170, 480 185 S 820 205, 1000 180 S 1300 120, 1440 170 L1440 220 L0 220Z" fill="url(#d2)"/>
+  </svg>
+
+  <div class="page">
+    <nav>
+      <a href="#" class="logo">Ranker</a>
+      <div class="nav-links">
+        <a href="#" data-branch="CSE">CSE</a>
+        <a href="#" data-branch="ECE">ECE</a>
+        <a href="#" data-branch="MECH">MECH</a>
+        <a href="#" data-branch="EEE">EEE</a>
+        <a href="#" data-branch="IT">IT</a>
+        <a href="http://127.0.0.1:8000/docs" class="pill">Official results ↗</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <h1>The only <span class="accent">100% free</span> leaderboard</h1>
+      <p class="sub">Powerful ranking system, powered by Postgres.</p>
+
+      <div class="tabs" role="tablist" aria-label="Branch" id="tabs"></div>
+
+      <div class="controls">
+        <input id="search" type="search" placeholder="Search by name or roll number" aria-label="Search students">
+        <select id="sort" aria-label="Sort by">
+          <option value="desc">Highest CGPA</option>
+          <option value="asc">Lowest CGPA</option>
+          <option value="name">Name A–Z</option>
+        </select>
+      </div>
+      <div class="meta">
+        <span id="summary"></span>
+        <span>Ranking <strong id="count">0</strong> students</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="board" aria-label="Leaderboard">
+        <div class="row head">
+          <div>Rank</div>
+          <div>Student</div>
+          <div class="branch">Branch</div>
+          <div class="cgpa">CGPA</div>
+        </div>
+        <div id="rows"></div>
+        <button class="more" id="more" hidden>Show more</button>
+      </section>
+      <p class="note" id="note"></p>
+    </main>
+  </div>
+
+<script>
+  const API_URL = 'https://rankz-swart.vercel.app';
+  const BRANCHES = ['All', 'CSE', 'ECE', 'MECH', 'EEE', 'IT'];
+  const PAGE_SIZE = 10;
+
+  const BRANCH_PATH = {
+    CSE: 'cse',
+    ECE: 'ece',
+    MECH: 'mech',
+    EEE: 'eee',
+    IT: 'it'
+  };
+
+    async function loadAllStudents() {
+  const results = [];
+  let usedSample = false;
+
+  for (const branch of Object.keys(BRANCH_PATH)) {
+    try {
+      const res = await fetch(API_URL + '/' + BRANCH_PATH[branch]);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const data = await res.json();
+
+      data.forEach(function (s) {
+        // s is an array: [roll, name, ?, cgpa, branch]
+        results.push({
+          roll:   s[0] || '',
+          name:   s[1] || '',
+          cgpa:   Number(s[3]) || 0,   // index 3 is CGPA
+          branch: s[4] || branch
+        });
+      });
+    } catch (err) {
+      console.warn('API failed for ' + branch, err);
+      usedSample = true;
+      break;
+    }
+  }
+
+  if (usedSample || results.length === 0) {
+    return { list: sampleData(), sample: true };
+  }
+  return { list: results, sample: false };
+}
+
+  function sampleData() {
+    let seed = 42;
+    const rand = function () {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    const first = ['Aarav','Diya','Rohan','Sneha','Karthik','Meera','Vikram','Ananya','Arjun','Isha','Kabir','Nisha'];
+    const last = ['Reddy','Sharma','Rao','Iyer','Patel','Naidu','Verma','Khan','Gupta','Das'];
+    const out = [];
+    BRANCHES.slice(1).forEach(function (b, bi) {
+      for (let i = 1; i <= 24; i++) {
+        out.push({
+          name: first[Math.floor(rand() * first.length)] + ' ' + last[Math.floor(rand() * last.length)],
+          roll: '1602-24-' + (733 + bi) + '-' + String(i).padStart(3, '0'),
+          branch: b,
+          cgpa: Math.round((6 + rand() * 3.9) * 100) / 100
+        });
+      }
+    });
+    return out;
+  }
+
+  function withRanks(students) {
+    const sorted = students.slice().sort(function (a, b) {
+      return b.cgpa - a.cgpa;
+    });
+    sorted.forEach(function (s, i) {
+      s.rank = (i > 0 && s.cgpa === sorted[i - 1].cgpa) ? sorted[i - 1].rank : i + 1;
+    });
+    return sorted;
+  }
+
+  const state = {
+    all: [],
+    branch: 'CSE',
+    query: '',
+    sort: 'desc',
+    shown: PAGE_SIZE,
+    sample: false
+  };
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function visibleList() {
+    const inBranch = state.branch === 'All'
+      ? state.all
+      : state.all.filter(function (s) { return s.branch === state.branch; });
+
+    let list = withRanks(inBranch);
+    const q = state.query.trim().toLowerCase();
+    if (q) {
+      list = list.filter(function (s) {
+        return s.name.toLowerCase().includes(q) || s.roll.toLowerCase().includes(q);
+      });
+    }
+    if (state.sort === 'asc') list.reverse();
+    if (state.sort === 'name') {
+      list.sort(function (a, b) {
+        return a.name.localeCompare(b.name);
+      });
+    }
+    return { list: list, total: inBranch.length };
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function render() {
+    const result = visibleList();
+    const list = result.list;
+    const total = result.total;
+    const rows = $('rows');
+    rows.replaceChildren();
+
+    if (!list.length) {
+      rows.appendChild(el('div', 'empty', 'No students match "' + state.query + '".'));
+    }
+
+    list.slice(0, state.shown).forEach(function (s) {
+      const row = el('div', 'row' + (s.rank <= 3 ? ' top' : ''));
+      const who = el('div', 'name', s.name);
+      who.appendChild(el('span', 'roll', s.roll));
+      row.append(
+        el('div', 'rank', '#' + s.rank),
+        who,
+        el('div', 'branch', s.branch),
+        el('div', 'cgpa', Number(s.cgpa).toFixed(2))
+      );
+      rows.appendChild(row);
+    });
+
+    $('more').hidden = list.length <= state.shown;
+    $('summary').textContent = state.query
+      ? list.length + ' result' + (list.length === 1 ? '' : 's')
+      : (state.branch === 'All' ? 'All branches' : state.branch + ' branch');
+    animateCount($('count'), total);
+
+    $('note').textContent = state.sample ? 'Showing sample data (API unreachable)' : '';
+  }
+
+  function buildTabs() {
+    const box = $('tabs');
+    BRANCHES.forEach(function (b) {
+      const btn = el('button', 'tab', b);
+      btn.setAttribute('role', 'tab');
+      btn.dataset.branch = b;
+      box.appendChild(btn);
+    });
+  }
+
+  function setBranch(b) {
+    state.branch = b;
+    state.shown = PAGE_SIZE;
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.setAttribute('aria-selected', String(t.dataset.branch === b));
+    });
+    render();
+  }
+
+  // Boot
+  buildTabs();
+
+  document.querySelectorAll('[data-branch]').forEach(function (e) {
+    e.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      setBranch(e.dataset.branch);
+    });
+  });
+
+  $('search').addEventListener('input', function (e) {
+    state.query = e.target.value;
+    state.shown = PAGE_SIZE;
+    render();
+  });
+
+  $('sort').addEventListener('change', function (e) {
+    state.sort = e.target.value;
+    render();
+  });
+
+  $('more').addEventListener('click', function () {
+    state.shown += PAGE_SIZE;
+    render();
+  });
+
+  function animateCount(node, to) {
+    const from = Number(node.dataset.value || 0);
+    const start = performance.now();
+    const dur = 700;
+    node.dataset.value = to;
+    (function tick(now) {
+      const p = Math.min((now - start) / dur, 1);
+      node.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))).toLocaleString('en-US');
+      if (p < 1) requestAnimationFrame(tick);
+    })(start);
+  }
+
+  // Stars
+  const starBox = $('stars');
+  for (let i = 0; i < 70; i++) {
+    const s = el('div', 'star');
+    const size = Math.random() < 0.15 ? 3 : 1.5;
+    const op = 0.25 + Math.random() * 0.75;
+    s.style.cssText = 'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 80) + '%;width:' + size + 'px;height:' + size + 'px;opacity:' + op;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && Math.random() < 0.25) {
+      s.animate(
+        [{ opacity: op }, { opacity: 0.1 }, { opacity: op }],
+        { duration: 3000 + Math.random() * 4000, iterations: Infinity, delay: Math.random() * 3000 }
+      );
+    }
+    starBox.appendChild(s);
+  }
+
+  // Load data
+  loadAllStudents().then(function (result) {
+    state.all = result.list;
+    state.sample = result.sample;
+    setBranch('CSE');
+  });
+</script>
+</body>
+</html>
